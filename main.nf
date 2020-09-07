@@ -139,7 +139,7 @@ if (workflow.revision) summary['Pipeline Release'] = workflow.revision
 summary['Run Name'] = custom_runName ?: workflow.runName
 summary['Samplesheet'] = params.input
 summary['Viral Fasta File'] = params.fasta
-summary['Amplicon bed'] = params.bedpe
+summary['Amplicon bed'] = params.bedpef
 if (params.adapter) summary['Adapter file'] = params.adapter
 summary['Data Type'] = params.single_end ? 'Single-End' : 'Paired-End'
 summary['Trimming tool'] = params.fastp ? 'FASTP' : 'TRIMMOMATIC'          
@@ -233,7 +233,7 @@ process FASTQC {
     tuple val(name), path(reads) from ch_raw_reads_fastqc
 
     output:
-    path '*.{zip,html}' into ch_fastqc_reports_mqc
+    path '*.{zip,html}'
 
     script:
     // Added soft-links to original fastqs for consistent naming in MultiQC
@@ -282,8 +282,8 @@ if (params.fastp) {
 
         output:
         tuple val(sample), path("*.trim.fastq.gz") into ch_trimmed_bowtie2
-        path "*.json" into ch_fastp_mqc
-        path "*_fastqc.{zip,html}" into ch_fastp_fastqc_mqc
+        path "*.json"
+        path "*_fastqc.{zip,html}"
         path "*.{log,fastp.html}"
         path "*.fail.fastq.gz"
 
@@ -595,7 +595,7 @@ process FASTQ_TO_FASTA {
     tuple val(sample), path(cons_fastq) from ch_consensus_fastq
 
     output:
-    tuple val(sample), path("*.fasta") into ch_consensus_fasta
+    tuple val(sample), path("*.fasta")
 
     script:
     """
