@@ -1,0 +1,9 @@
+# Compiled class file
+.nextflow*
+work/
+results/
+# data  // Provisional
+.DS_Store
+tests/
+testing/
+*.pyc
