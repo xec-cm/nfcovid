@@ -347,7 +347,7 @@ if (!params.fastp) {
 
         output:
         tuple val(sample), path("*_trim.fastq.gz") into ch_trimmed_bowtie2
-        if (!params.single_end) { path "*_fail.fastq.gz" }
+        path "*_fail.fastq.gz" optional true
         path "*.log"
 
         script:
