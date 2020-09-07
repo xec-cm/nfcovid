@@ -22,10 +22,9 @@ def helpMessage() {
         --fasta [file]                    Path to fasta reference for viral genome. 
         --bedpe [file]                    Path to BED file containing amplicon positions. Mandatory when calling variants with --protocol amplicon
         --adapter [file]                  Parh of adapter file for trimmomatic triming. Mandatory wher --fastp is false 
-        -profile [str]                    Configuration profile to use. Can use multiple (comma separated)
-                                          Available: conda and docker
+        -profile [str]                    Configuration profile to use. Can use multiple (comma separated) Available: conda and docker
+    
     Generic 
-
         --single_end [bool]               Specifies that the input is single-end reads (Default: false)
 
     Read trimming
@@ -315,7 +314,7 @@ if (!params.fastp) {
         label "process_medium"
         publishDir "${params.outdir}/trimmomatic", mode: params.publish_dir_mode,
             saveAs: { filename ->
-                        if (filename.endsWith(".json")) filename
+                        if (filename.endsWith(".log")) "log/$filename"
                         else params.save_trimmed ? filename : null
                     }
 
@@ -325,7 +324,8 @@ if (!params.fastp) {
 
         output:
         tuple val(sample), path("*_pe.fastq.gz") into ch_trimmed_bowtie2
-        path "*.pe.fastq.gz"
+        path "*_se.fastq.gz"
+        path "*.log"
 
         script:
         // Added soft-links to original fastqs for consistent naming in MultiQC
@@ -334,9 +334,10 @@ if (!params.fastp) {
         [ ! -f  ${sample}_1.fastq.gz ] && ln -s ${reads[0]} ${sample}_1.fastq.gz
         [ ! -f  ${sample}_2.fastq.gz ] && ln -s ${reads[1]} ${sample}_2.fastq.gz
         IN_READS='${sample}_1.fastq.gz ${sample}_2.fastq.gz'
-        OUT_READS='${sample}_1_pe.fastq.gz ${sample}_1_se.fastq.gz ${sample}_2_pe.fastq.gz${sample}_2_se.fastq.gz'
-        trimmomatic $autodetect -threads $task.cpus -phred33 $IN_READS $OUT_READS  \\
-            ILLUMINACLIP:${adapterFile}:2:30:10 LEADING:30 TRAILING:30 MINLEN:75 SLIDINGWINDOW:30:20
+        OUT_READS='${sample}_1_pe.fastq.gz ${sample}_1_se.fastq.gz ${sample}_2_pe.fastq.gz ${sample}_2_se.fastq.gz'
+        
+        trimmomatic $autodetect -threads $task.cpus -phred33 \${IN_READS} \${OUT_READS}  \\
+            ILLUMINACLIP:${adapterFile}:2:30:10 LEADING:30 TRAILING:30 MINLEN:75 SLIDINGWINDOW:30:20 2> ${sample}.trimmomatic.log
         """
     }
 }
@@ -478,7 +479,6 @@ ch_sort_bam
 /*
  * STEP 3.4: TRIM SEQUENCES
  */
-
 process TRIM {
     tag "$sample"
     label "process_medium"

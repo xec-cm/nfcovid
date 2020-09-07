@@ -31,6 +31,7 @@ dependencies:
   - bioconda::bedtools=2.29.2
   - bioconda::multiqc=1.9
   - bioconda::bamclipper=1.0.0
+  - bioconda::trimmomatic=0.39
 
   ## variants
   - bioconda::bowtie2=2.4.1
