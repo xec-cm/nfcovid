@@ -135,10 +135,14 @@ if (workflow.profile.contains('awsbatch')) {
 
 // Header log info
 def summary = [:]
-if (workflow.revision)               summary['Pipeline Release'] = workflow.revision
-summary['Run Name']                  = custom_runName ?: workflow.runName
-summary['Samplesheet']               = params.input
-summary['Viral Fasta File']          = params.fasta
+if (workflow.revision) summary['Pipeline Release'] = workflow.revision
+summary['Run Name'] = custom_runName ?: workflow.runName
+summary['Samplesheet'] = params.input
+summary['Viral Fasta File'] = params.fasta
+summary['Amplicon bed'] = params.bedpe
+if (params.adapter) summary['Adapter file'] = params.adapter
+summary['Data Type'] = params.single_end ? 'Single-End' : 'Paired-End'
+summary['Trimming tool'] = params.fastp ? 'FASTP' : 'TRIMMOMATIC'          
 if (params.save_trimmed)             summary['Save Trimmed'] = 'Yes'
 summary['Min Mapped Reads']      = params.min_mapped_reads
 if (params.filter_unmapped)      summary['Remove Unmapped Reads']  = 'Yes'
