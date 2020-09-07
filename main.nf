@@ -305,6 +305,7 @@ if (params.fastp) {
                 --json ${sample}.fastp.json \\
                 --html ${sample}.fastp.html \\
                 2> ${sample}.fastp.log
+            
             fastqc --quiet *.trim.fastq.gz
             """
         } else {
@@ -325,6 +326,7 @@ if (params.fastp) {
                 --json ${sample}.fastp.json \\
                 --html ${sample}.fastp.html \\
                 2> ${sample}.fastp.log
+            
             fastqc --quiet *.trim.fastq.gz
             """
         }
@@ -338,6 +340,8 @@ if (!params.fastp) {
         publishDir "${params.outdir}/trimmomatic", mode: params.publish_dir_mode,
             saveAs: { filename ->
                         if (filename.endsWith(".log")) "log/$filename"
+                        else if (filename.endsWith("_fastqc.html")) "fastqc/$filename"
+                        else if (filename.endsWith(".zip")) "fastqc/zips/$filename"
                         else params.save_trimmed ? filename : null
                     }
 
@@ -349,6 +353,7 @@ if (!params.fastp) {
         tuple val(sample), path("*_trim.fastq.gz") into ch_trimmed_bowtie2
         path "*_fail.fastq.gz" optional true
         path "*.log"
+        path "*_fastqc.{zip,html}"
 
         script:
         // Added soft-links to original fastqs for consistent naming in MultiQC
@@ -359,6 +364,8 @@ if (!params.fastp) {
             OUT_READS='${sample}_trim.fastq.gz'
             trimmomatic SE -threads $task.cpus -phred33 \${IN_READS} \${OUT_READS}  \\
                 ILLUMINACLIP:${adapterFile}:2:30:10 LEADING:30 TRAILING:30 MINLEN:75 SLIDINGWINDOW:30:20 2> ${sample}.trimmomatic.log
+            
+            fastqc --quiet *_trim.fastq.gz
             """
         } else {
             """
@@ -369,6 +376,8 @@ if (!params.fastp) {
             
             trimmomatic PE -threads $task.cpus -phred33 \${IN_READS} \${OUT_READS}  \\
                 ILLUMINACLIP:${adapterFile}:2:30:10 LEADING:30 TRAILING:30 MINLEN:75 SLIDINGWINDOW:30:20 2> ${sample}.trimmomatic.log
+            
+            fastqc --quiet *_trim.fastq.gz
             """
         }
     } 
