@@ -1,7 +1,7 @@
 #!/usr/bin/env nextflow
 /*
 ========================================================================================
-                        nf-core/viralrecon
+                                    xec-cm/nfcovid
 ========================================================================================
     nfcovid Analysis Pipeline.
     #### Homepage / Documentation
@@ -21,7 +21,7 @@ def helpMessage() {
         --input [file]                    Comma-separated file containing information about the samples in the experiment (see docs/usage.md)
         --fasta [file]                    Path to fasta reference for viral genome. 
         --bedpe [file]                    Path to BED file containing amplicon positions. Mandatory when calling variants with --protocol amplicon
-        --adapter [file]                  Parh of adapter file for trimmomatic triming. Mandatory wher --fastp is false 
+        --adapter [file]                  Parh of adapter file for trimmomatic triming. Mandatory when --fastp is false 
         -profile [str]                    Configuration profile to use. Can use multiple (comma separated) Available: conda and docker
     
     Generic 
@@ -285,26 +285,45 @@ if (params.fastp) {
 
         script:
         // Added soft-links to original fastqs for consistent naming in MultiQC
-        autodetect = "--detect_adapter_for_pe" //autodetect = single_end ? "" : "--detect_adapter_for_pe"
-        """
-        [ ! -f  ${sample}_1.fastq.gz ] && ln -s ${reads[0]} ${sample}_1.fastq.gz
-        [ ! -f  ${sample}_2.fastq.gz ] && ln -s ${reads[1]} ${sample}_2.fastq.gz
-        IN_READS='--in1 ${sample}_1.fastq.gz --in2 ${sample}_2.fastq.gz'
-        OUT_READS='--out1 ${sample}_1.trim.fastq.gz --out2 ${sample}_2.trim.fastq.gz --unpaired1 ${sample}_1.fail.fastq.gz --unpaired2 ${sample}_2.fail.fastq.gz'
+        if (params.single_end) {
+            """
+            [ ! -f  ${sample}.fastq.gz ] && ln -s $reads ${sample}.fastq.gz
+            IN_READS='--in1 ${sample}.fastq.gz'
+            OUT_READS='--out1 ${sample}.trim.fastq.gz --failed_out ${sample}.fail.fastq.gz'
+            
+            fastp \\
+                \$IN_READS \\
+                \$OUT_READS \\
+                --cut_front \\
+                --cut_tail \\
+                --length_required 50 \\
+                --trim_poly_x \\
+                --json ${sample}.fastp.json \\
+                --html ${sample}.fastp.html \\
+                2> ${sample}.fastp.log
+            fastqc --quiet *.trim.fastq.gz
+            """
+        } else {
+            """ 
+            [ ! -f  ${sample}_1.fastq.gz ] && ln -s ${reads[0]} ${sample}_1.fastq.gz
+            [ ! -f  ${sample}_2.fastq.gz ] && ln -s ${reads[1]} ${sample}_2.fastq.gz
+            IN_READS='--in1 ${sample}_1.fastq.gz --in2 ${sample}_2.fastq.gz'
+            OUT_READS='--out1 ${sample}_1.trim.fastq.gz --out2 ${sample}_2.trim.fastq.gz --unpaired1 ${sample}_1.fail.fastq.gz --unpaired2 ${sample}_2.fail.fastq.gz'
 
-        fastp \\
-            \$IN_READS \\
-            \$OUT_READS \\
-            $autodetect \\
-            --cut_front \\
-            --cut_tail \\
-            --length_required 50 \\
-            --trim_poly_x \\
-            --json ${sample}.fastp.json \\
-            --html ${sample}.fastp.html \\
-            2> ${sample}.fastp.log
-        fastqc --quiet *.trim.fastq.gz
-        """
+            fastp \\
+                \$IN_READS \\
+                \$OUT_READS \\
+                --detect_adapter_for_pe \\
+                --cut_front \\
+                --cut_tail \\
+                --length_required 50 \\
+                --trim_poly_x \\
+                --json ${sample}.fastp.json \\
+                --html ${sample}.fastp.html \\
+                2> ${sample}.fastp.log
+            fastqc --quiet *.trim.fastq.gz
+            """
+        }
     }
 }
 
@@ -323,24 +342,33 @@ if (!params.fastp) {
         path adapterFile from ch_adapter
 
         output:
-        tuple val(sample), path("*_pe.fastq.gz") into ch_trimmed_bowtie2
-        path "*_se.fastq.gz"
+        tuple val(sample), path("*_trim.fastq.gz") into ch_trimmed_bowtie2
+        if (!params.single_end) { path "*_fail.fastq.gz" }
         path "*.log"
 
         script:
         // Added soft-links to original fastqs for consistent naming in MultiQC
-        autodetect = "PE" //autodetect = single_end ? "SE" : "PE"
-        """
-        [ ! -f  ${sample}_1.fastq.gz ] && ln -s ${reads[0]} ${sample}_1.fastq.gz
-        [ ! -f  ${sample}_2.fastq.gz ] && ln -s ${reads[1]} ${sample}_2.fastq.gz
-        IN_READS='${sample}_1.fastq.gz ${sample}_2.fastq.gz'
-        OUT_READS='${sample}_1_pe.fastq.gz ${sample}_1_se.fastq.gz ${sample}_2_pe.fastq.gz ${sample}_2_se.fastq.gz'
-        
-        trimmomatic $autodetect -threads $task.cpus -phred33 \${IN_READS} \${OUT_READS}  \\
-            ILLUMINACLIP:${adapterFile}:2:30:10 LEADING:30 TRAILING:30 MINLEN:75 SLIDINGWINDOW:30:20 2> ${sample}.trimmomatic.log
-        """
-    }
-}
+        if (params.single_end) {
+            """ 
+            [ ! -f  ${sample}.fastq.gz ] && ln -s $reads ${sample}.fastq.gz
+            IN_READS='${sample}.fastq.gz'
+            OUT_READS='${sample}_trim.fastq.gz'
+            trimmomatic SE -threads $task.cpus -phred33 \${IN_READS} \${OUT_READS}  \\
+                ILLUMINACLIP:${adapterFile}:2:30:10 LEADING:30 TRAILING:30 MINLEN:75 SLIDINGWINDOW:30:20 2> ${sample}.trimmomatic.log
+            """
+        } else {
+            """
+            [ ! -f  ${sample}_1.fastq.gz ] && ln -s ${reads[0]} ${sample}_1.fastq.gz
+            [ ! -f  ${sample}_2.fastq.gz ] && ln -s ${reads[1]} ${sample}_2.fastq.gz
+            IN_READS='${sample}_1.fastq.gz ${sample}_2.fastq.gz'
+            OUT_READS='${sample}_1_trim.fastq.gz ${sample}_1_fail.fastq.gz ${sample}_2_trim.fastq.gz ${sample}_2_fail.fastq.gz'
+            
+            trimmomatic PE -threads $task.cpus -phred33 \${IN_READS} \${OUT_READS}  \\
+                ILLUMINACLIP:${adapterFile}:2:30:10 LEADING:30 TRAILING:30 MINLEN:75 SLIDINGWINDOW:30:20 2> ${sample}.trimmomatic.log
+            """
+        }
+    } 
+}  
 
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
@@ -395,7 +423,7 @@ process BOWTIE2 {
     path "*.log" into ch_bowtie2_mqc
 
     script:
-    input_reads = "-1 ${reads[0]} -2 ${reads[1]}" //input_reads = single_end ? "-U $reads" : "-1 ${reads[0]} -2 ${reads[1]}"
+    input_reads = params.single_end ? "-U $reads" : "-1 ${reads[0]} -2 ${reads[1]}"
     filter = params.filter_unmapped ? "-F4" : ""
     """
     bowtie2 \\
